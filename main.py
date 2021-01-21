@@ -34,7 +34,7 @@ class Settings:
             elif is_create_dir == 'false':
                 print("== Directory doesn't exist!")
             else:
-                print('== Invalid configuration file! `is_create_dir` needs to be either "true" or "false"')
+                print('== Invalid configuration file! `create_dir_if_no_exist` needs to be either "true" or "false"')
 
     @staticmethod
     def get_output_dir():
@@ -42,16 +42,27 @@ class Settings:
 
 
 class Requester:
+    _timeout = 60
+
     @staticmethod
     def get_soup(url):
-        print(f'Requesting {url}')
-        website = requests.get(url)
-        return BeautifulSoup(website.content, 'html.parser')
+        while True:
+            try:
+                print(f'Requesting {url}')
+                website = requests.get(url, timeout=Requester._timeout)
+                return BeautifulSoup(website.content, 'html.parser')
+            except TimeoutError:
+                print('== Request timed out, trying again!')
 
     @staticmethod
     def post(url, params):
-        curr_page = requests.post(url, data=params)
-        return BeautifulSoup(curr_page.content, 'html.parser')
+        while True:
+            try:
+                curr_page = requests.post(url, data=params, timeout=Requester._timeout)
+                return BeautifulSoup(curr_page.content, 'html.parser')
+            except TimeoutError:
+                print('== Request timed out, trying again!')
+
 
 class MySoup:
     def __init__(self, soup):
