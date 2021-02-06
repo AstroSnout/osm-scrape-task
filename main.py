@@ -3,6 +3,9 @@ import os
 import requests
 import csv
 import configparser
+import math
+import threading
+import time
 from bs4 import BeautifulSoup
 
 
@@ -73,19 +76,30 @@ class MySoup:
 
     def get_total_pages(self):
         # There's probably a prettier way of doing this
-        total_pages = 0
+        total_pages = 1
+        records_per_page = None
+        total_records = None
         # Find all the script tags
         for scripts in self.soup.find_all('script'):
             # Break them up into lines
             for block in str(scripts).split('\n'):
                 # Find the variable which says how many pages there are
-                if 'var m_nPageSize = ' in block:
+                if 'var m_nRecordCount = ' in block:
                     # Strip all the unnecessary characters, leaving only the number
-                    total_pages = block.replace('var m_nPageSize = ', '').replace(';\r', '')
+                    total_records = block.replace('var m_nRecordCount = ', '').replace(';\r', '')
                     try:
-                        total_pages = int(total_pages)
+                        total_records = int(total_records)
                     except AttributeError:
                         print('pages NaN')
+                if 'var m_nPageSize = ' in block:
+                    # Strip all the unnecessary characters, leaving only the number
+                    records_per_page = block.replace('var m_nPageSize = ', '').replace(';\r', '')
+                    try:
+                        records_per_page = int(records_per_page)
+                    except AttributeError:
+                        print('pages NaN')
+                if records_per_page and total_records:
+                    total_pages = math.ceil(total_records / records_per_page)
                     break
         return total_pages
 
@@ -127,6 +141,7 @@ def main():
         soup = MySoup(response_soup)
         # Grabbing total number of pages for requested currency
         total_pages = soup.get_total_pages()
+
         # Prepare the file
         filename = f'[{low_date}] [{high_date}] {currency}.csv'
         outputdir = Settings.get_output_dir()
@@ -140,22 +155,39 @@ def main():
             else:
                 writer.writerow([cell.text for cell in header_cells])
                 # Do the same for every available page
+                all_data = [[] for x in range(total_pages)]
+                threads = []
                 if total_pages >= 1:
                     for i in range(1, total_pages + 1):
                         print(f'== Scraping ({i}/{total_pages})')
-                        response_soup = Requester.post(
-                            url_to_scrape,
-                            {
-                                'erectDate': low_date,
-                                'nothing': high_date,
-                                'pjname': currency,
-                                'page': i
-                            }
-                        )
-                        data = MySoup(response_soup).get_table_data()
-                        for row in data:
-                            writer.writerow([cell.text for cell in row])
+                        params = {
+                            'erectDate': low_date,
+                            'nothing': high_date,
+                            'pjname': currency,
+                            'page': i
+                        }
+                        thread = threading.Thread(target=req_thread, args=[url_to_scrape, params, all_data])
+                        thread.start()
+                        threads.append(thread)
+                        # Manual throttle due to the amount of requests being sent (5 req per second)
+                        time.sleep(0.2)
+
+                    for thread in threads:
+                        thread.join()
+
+                    flat_all_data = [item for ls in all_data for item in ls]
+                    for row in flat_all_data:
+                        writer.writerow([cell.text for cell in row])
         print('===========')
 
+
+def req_thread(url, params, all_data):
+    response_soup = Requester.post(
+        url,
+        params
+    )
+    data = MySoup(response_soup).get_table_data()
+    all_data[params['page']-1] = data
+    return True
 
 main()
