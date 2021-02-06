@@ -10,3 +10,10 @@ Packages used (3rd party):
 * requests
 
 Full package requirements can be found in the `requirements.txt` file.
+
+
+### Feb 6th update:
+* Implemented threading for faster scraping
+* Fixed an issue where total page amount wasn't being calculated properly 
+
+Note: It can go even faster, but it's been throttled to avoid sending too many requests at once.
