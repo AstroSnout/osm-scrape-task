@@ -47,16 +47,21 @@ class Requester:
     _timeout = 60
 
     @staticmethod
-    async def async_get_soup(url):
-        print('Requesting ->', url)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=Requester._timeout) as resp:
-                return BeautifulSoup(await resp.text(), 'html.parser')
+    async def async_get_soup(url, run_until_ok=False):
+        # Semaphore to regulate how many requests in parallel we're making
+        async with semaphore:
+            print('Requesting ->', url)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=Requester._timeout) as resp:
+                    if resp.status == 200 or not run_until_ok:
+                        return BeautifulSoup(await resp.text(), 'html.parser')
+                    else:
+                        print(f'Response status {resp.status}, trying again')
+                        await asyncio.sleep(0.1)
 
     @staticmethod
     async def async_post(url, params, run_until_ok=False):
         # Semaphore to regulate how many requests in parallel we're making
-        semaphore = asyncio.Semaphore(10)
         async with semaphore:
             print('Posting ->', params)
             async with aiohttp.ClientSession() as session:
@@ -83,25 +88,28 @@ class MyQueue:
     async def process(self):
         result = []
         task_res = await asyncio.gather(*self._running_tasks)
-        result += task_res  # if task_res is not None else []
+        result += task_res
         self._clear_queue()
         return result
 
     async def batch_process(self, concurrent=3):
         result = []
         while True:
+            # If no more tasks queued
             if not self._tasks_to_do:
+                # Process running tasks and break out of batch process loop
                 if self._running_tasks:
                     task_res = await self.process()
-                    result += task_res  # if task_res is not None else []
+                    result += task_res
                 break
+            # If we're not on concurrency limit, add more tasks to be done
             elif len(self._running_tasks) < concurrent:
                 self._running_tasks.append(
                     self._tasks_to_do.pop(0)
                 )
             else:
                 task_res = await self.process()
-                result += task_res  # if task_res is not None else []
+                result += task_res
         return result
 
 
@@ -235,5 +243,7 @@ async def main():
         )
     await queue.batch_process(concurrent=50)
 
+# Globally available semaphore to regulate concurrent tasks performed
+semaphore = asyncio.Semaphore(10)
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
