@@ -226,7 +226,7 @@ async def main():
     currencies = soup.get_currencies()
     # Getting dates for POST request params
     high_date = dt.datetime.today().strftime('%Y-%m-%d')
-    low_date = (dt.datetime.today() - dt.timedelta(days=7)).strftime('%Y-%m-%d')
+    low_date = (dt.datetime.today() - dt.timedelta(days=2)).strftime('%Y-%m-%d')
     # Going over the data for all listed currencies
     queue = MyQueue()
     for currency in currencies:
