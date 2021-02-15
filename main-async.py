@@ -201,7 +201,7 @@ async def currency_batch_task(url_to_scrape, currency, low_date, high_date):
             )
         results = await queue.batch_process(concurrent=2)
         # Sorting data from coros in order in which they were queued
-        all_data = [[] for x in range(total_pages)]
+        all_data = [[] for _ in range(total_pages)]
         for r in results:
             all_data[r[0]] = r[1]
         flat_all_data = [item for ls in all_data for item in ls]
