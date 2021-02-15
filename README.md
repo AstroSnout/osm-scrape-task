@@ -17,3 +17,7 @@ Full package requirements can be found in the `requirements.txt` file.
 * Fixed an issue where total page amount wasn't being calculated properly 
 
 Note: It can go even faster, but it's been throttled to avoid sending too many requests at once.
+
+### Feb 15th update:
+* Implemented an asynchronous version of the scraper
+* Refer to the `requirements.txt` file for added requirements (notable inclusions are `asyncio` and `aiohttp`)
